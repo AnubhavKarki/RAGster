@@ -1,6 +1,4 @@
-import streamlit as st
-from streamlit_chat import message  # pip install streamlit-chat
-
+# RAG Q&A System - Modular Pipeline
 
 def load_document(file):
     import os
@@ -447,80 +445,349 @@ def print_help_menu():
     print("-" * 30 + "\n")
 
 
-def main_rag_pipeline_gui():
-    st.set_page_config(page_title="RAG Q&A", layout="wide")
-    st.title("RAG Q&A Pipeline")
+# def main_rag_pipeline_gui():
+#     st.set_page_config(page_title="RAG Q&A", layout="wide")
+#     st.title("RAG Q&A Pipeline")
 
-    # Sidebar for setup
+#     # Sidebar for setup
+#     with st.sidebar:
+#         st.header("Setup")
+
+#         # Document upload
+#         uploaded_file = st.file_uploader("Upload PDF/Docx", type=["pdf", "docx"])
+#         wiki_query = st.text_input("Or Wikipedia query")
+
+#         # Vector store choice
+#         store_choice = st.selectbox("Vector Store", ["pinecone", "chroma"])
+
+#         if store_choice == "pinecone":
+#             index_name = st.text_input("Pinecone Index Name")
+#         else:
+#             persist_dir = st.text_input("Chroma Directory", value="/tmp/chroma_db")
+
+#         if st.button("Process Document"):
+#             with st.spinner("Processing..."):
+#                 if uploaded_file:
+#                     # Save uploaded file
+#                     with open("temp_doc.pdf", "wb") as f:
+#                         f.write(uploaded_file.getvalue())
+#                     data = load_document("temp_doc.pdf")
+#                 elif wiki_query:
+#                     data = load_from_wikipedia(wiki_query)
+
+#                 chunks = chunk_data(data)
+#                 st.success(f"Created {len(chunks)} chunks")
+
+#                 print_embedding_cost(chunks)
+
+#                 if store_choice == "pinecone":
+#                     vector_store = insert_or_fetch_embeddings(index_name, chunks)
+#                 else:
+#                     vector_store = create_embeddings_chroma(chunks, persist_dir)
+
+#                 st.session_state.vector_store = vector_store
+#                 st.session_state.store_choice = store_choice
+#                 st.rerun()
+
+#     # Chat interface (main area)
+#     if "messages" not in st.session_state:
+#         st.session_state.messages = []
+
+#     # Chat history
+#     for msg in st.session_state.messages:
+#         message(msg["content"], is_user=msg["role"] == "user")
+
+#     # Chat input
+#     if "vector_store" in st.session_state:
+#         if prompt := st.chat_input("Ask a question..."):
+#             st.session_state.messages.append({"role": "user", "content": prompt})
+#             st.rerun()
+
+#             with st.chat_message("user"):
+#                 st.write(prompt)
+
+#             # Get answer using YOUR RAGWithMemory class!
+#             rag = RAGWithMemory(st.session_state.vector_store)
+#             answer = rag.invoke(prompt)
+
+#             st.session_state.messages.append({"role": "assistant", "content": answer})
+#             st.rerun()
+
+#             with st.chat_message("assistant"):
+#                 st.write(answer)
+
+#     else:
+#         st.info("Upload a document and click 'Process Document' to start!")
+
+import streamlit as st
+from streamlit_chat import message
+import time
+
+def main_rag_pipeline_gui():
+    # Modern config
+    st.set_page_config(
+        page_title="RAGister AI", 
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
+    # Custom CSS for modern look
+    st.markdown("""
+    <style>
+    .main-header {
+        font-size: 3rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .chat-message {
+        padding: 1.5rem;
+        border-radius: 1.5rem;
+        margin-bottom: 1rem;
+        max-width: 80%;
+    }
+    .user-message {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        margin-left: auto;
+        color: white;
+    }
+    .assistant-message {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        color: white;
+    }
+    .status-bar {
+        background: rgba(0,0,0,0.05);
+        padding: 1rem;
+        border-radius: 1rem;
+        border-left: 4px solid #667eea;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Main header
+    st.markdown('<h1 class="main-header">RAGister AI Assistant</h1>', unsafe_allow_html=True)
+    st.markdown("---")
+    
+    # Minimal functional sidebar - ALL UNIQUE KEYS
     with st.sidebar:
         st.header("Setup")
-
-        # Document upload
-        uploaded_file = st.file_uploader("Upload PDF/Docx", type=["pdf", "docx"])
-        wiki_query = st.text_input("Or Wikipedia query")
-
-        # Vector store choice
-        store_choice = st.selectbox("Vector Store", ["pinecone", "chroma"])
-
-        if store_choice == "pinecone":
-            index_name = st.text_input("Pinecone Index Name")
+        
+        # Radio with UNIQUE KEY
+        doc_type = st.radio(
+            "Document Source", 
+            ["Upload File", "Wikipedia"],
+            key="doc_source_radio_unique"
+        )
+        
+        uploaded_file = None
+        wiki_query = ""
+        
+        if doc_type == "Upload File":
+            uploaded_file = st.file_uploader(
+                "Choose PDF/Docx", 
+                type=["pdf", "docx"],
+                key="file_uploader_key_unique"
+            )
         else:
-            persist_dir = st.text_input("Chroma Directory", value="/tmp/chroma_db")
-
-        if st.button("Process Document"):
-            with st.spinner("Processing..."):
+            wiki_query = st.text_input(
+                "Wikipedia Query", 
+                key="wiki_query_input_unique"
+            )
+        
+        # Vector store choice with UNIQUE KEY
+        store_choice = st.selectbox(
+            "Vector Store", 
+            ["pinecone", "chroma"], 
+            key="store_choice_select_unique"
+        )
+        
+        # Store-specific inputs with UNIQUE KEYS
+        if store_choice == "pinecone":
+            index_name = st.text_input(
+                "Pinecone Index", 
+                key="pinecone_index_input_unique"
+            )
+        else:
+            persist_dir = st.text_input(
+                "Chroma Directory", 
+                value="/tmp/chroma_db", 
+                key="chroma_dir_input_unique"
+            )
+        
+        # Process button with UNIQUE KEY
+        process_btn = st.button(
+            "Process Document", 
+            type="primary", 
+            key="process_button_unique"
+        )
+    
+    # Status notifications
+    if "status" in st.session_state:
+        with st.container():
+            status_class = "status-bar"
+            st.markdown(f"""
+            <div class="{status_class}">
+                <strong>{st.session_state.status['title']}:</strong> 
+                {st.session_state.status['message']}
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Initialize session state
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    if "vector_store" not in st.session_state:
+        st.session_state.vector_store = None
+    if "embedding_cost" not in st.session_state:
+        st.session_state.embedding_cost = 0
+    
+    # Process document
+    if process_btn and (uploaded_file or wiki_query):
+        with st.spinner("Processing document..."):
+            try:
+                # Load document
                 if uploaded_file:
-                    # Save uploaded file
-                    with open("temp_doc.pdf", "wb") as f:
+                    suffix = uploaded_file.name.split('.')[-1].lower()
+                    filename = f"temp_doc.{suffix}"
+                    
+                    with open(filename, "wb") as f:
                         f.write(uploaded_file.getvalue())
-                    data = load_document("temp_doc.pdf")
+                    data = load_document(filename)
+                    
+                    # Cleanup
+                    import os
+                    if os.path.exists(filename):
+                        os.remove(filename)
+                    
+                    st.session_state.status = {
+                        "title": "Document Loaded",
+                        "message": f"{len(data)} pages from {uploaded_file.name}",
+                        "success": True
+                    }
+                    
                 elif wiki_query:
-                    data = load_from_wikipedia(wiki_query)
-
+                    data = load_from_wikipedia(wiki_query, load_max_docs=2)
+                    st.session_state.status = {
+                        "title": "Wikipedia Loaded", 
+                        "message": f"{len(data)} pages on '{wiki_query}'",
+                        "success": True
+                    }
+                
+                # Chunking
                 chunks = chunk_data(data)
-                st.success(f"Created {len(chunks)} chunks")
-
-                print_embedding_cost(chunks)
-
-                if store_choice == "pinecone":
+                st.session_state.status = {
+                    "title": "Chunking Complete",
+                    "message": f"Created {len(chunks)} chunks",
+                    "success": True
+                }
+                
+                # Embedding cost
+                import tiktoken
+                enc = tiktoken.encoding_for_model('text-embedding-3-small')
+                total_tokens = sum([len(enc.encode(page.page_content)) for page in chunks])
+                cost_usd = total_tokens / 1000 * 0.0004
+                st.session_state.embedding_cost = cost_usd
+                
+                st.session_state.status = {
+                    "title": "Embedding Cost",
+                    "message": f"{total_tokens:,} tokens = ${cost_usd:.6f}",
+                    "success": True
+                }
+                
+                # Create vector store
+                if store_choice == "pinecone" and index_name:
                     vector_store = insert_or_fetch_embeddings(index_name, chunks)
-                else:
+                    st.session_state.status = {
+                        "title": "Pinecone Ready",
+                        "message": f"Index '{index_name}' created/loaded",
+                        "success": True
+                    }
+                elif store_choice == "chroma":
+                    import os
+                    os.makedirs(persist_dir, exist_ok=True)
                     vector_store = create_embeddings_chroma(chunks, persist_dir)
-
+                    st.session_state.status = {
+                        "title": "Chroma Ready", 
+                        "message": f"Database at {persist_dir}",
+                        "success": True
+                    }
+                
                 st.session_state.vector_store = vector_store
                 st.session_state.store_choice = store_choice
                 st.rerun()
-
+                
+            except Exception as e:
+                st.error(f"Processing failed: {str(e)}")
+                st.session_state.status = {
+                    "title": "Error", 
+                    "message": str(e),
+                    "success": False
+                }
+    
     # Chat interface (main area)
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-    # Chat history
-    for msg in st.session_state.messages:
-        message(msg["content"], is_user=msg["role"] == "user")
-
-    # Chat input
-    if "vector_store" in st.session_state:
-        if prompt := st.chat_input("Ask a question..."):
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            st.rerun()
-
-            with st.chat_message("user"):
-                st.write(prompt)
-
-            # Get answer using YOUR RAGWithMemory class!
-            rag = RAGWithMemory(st.session_state.vector_store)
-            answer = rag.invoke(prompt)
-
-            st.session_state.messages.append({"role": "assistant", "content": answer})
-            st.rerun()
-
-            with st.chat_message("assistant"):
-                st.write(answer)
-
-    else:
-        st.info("Upload a document and click 'Process Document' to start!")
-
+    chat_container = st.container()
+    
+    with chat_container:
+        # Show chat history
+        for i, msg in enumerate(st.session_state.messages):
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+        
+        # Chat input (only if vector store ready)
+        if st.session_state.vector_store:
+            if prompt := st.chat_input("Ask a question about your document..."):
+                # Add user message
+                st.session_state.messages.append({"role": "user", "content": prompt})
+                with st.chat_message("user"):
+                    st.markdown(prompt)
+                
+                # Generate response
+                with st.chat_message("assistant"):
+                    with st.spinner("Generating response..."):
+                        try:
+                            rag = RAGWithMemory(st.session_state.vector_store)
+                            answer = rag.invoke(prompt)
+                            
+                            st.markdown(answer)
+                            st.session_state.status = {
+                                "title": "Response Generated",
+                                "message": "Answer ready!",
+                                "success": True
+                            }
+                            
+                            # Add to history
+                            st.session_state.messages.append({
+                                "role": "assistant", 
+                                "content": answer
+                            })
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"Response failed: {str(e)}")
+                            st.session_state.status = {
+                                "title": "Response Error",
+                                "message": str(e),
+                                "success": False
+                            }
+        else:
+            # Welcome screen
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.markdown("""
+                ### Get Started
+                1. **Upload** PDF/Docx OR enter Wikipedia topic
+                2. **Configure** vector store (Pinecone/Chroma)
+                3. **Click** "Process Document" 
+                4. **Start asking** questions!
+                
+                *Cost shown before processing - No surprises.*
+                """)
+    
+    # Footer
+    st.markdown("---")
+    st.markdown("*RAGister - Production RAG Pipeline*")
 
 if __name__ == "__main__":
     main_rag_pipeline_gui()
