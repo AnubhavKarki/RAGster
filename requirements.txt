@@ -1,0 +1,10 @@
+pypdf
+langchain 
+langchain_community 
+langchain_openai 
+docx2txt 
+wikipedia 
+langchain_text_splitters 
+langchain_pinecone 
+chromadb 
+streamlit-chat
